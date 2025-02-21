@@ -7,7 +7,7 @@ import remarkMath from 'remark-math'
 import rehypeRaw from 'rehype-raw'
 import rehypeKatex from 'rehype-katex'
 import rehypeHighlight from 'rehype-highlight'
-import { Typography, Table, Collapse, theme, Button } from 'antd'
+import { Typography, Table, Collapse, theme, Button, Space } from 'antd'
 import { 
   BulbOutlined, 
   CopyOutlined,
@@ -229,9 +229,12 @@ const markdownComponents = {
   )
 }
 
-export default function MessageContent({ content }) {
+export default function MessageContent({ content, showAnimation = false }) {
   const hasMounted = useHasMounted()
   const { token } = theme.useToken()
+  const [isThinking, setIsThinking] = useState(false)
+  const [currentThinkContent, setCurrentThinkContent] = useState('')
+  const [processedContent, setProcessedContent] = useState({ mainContent: '', thinkContent: '' })
 
   // 在组件挂载时动态添加 KaTeX 样式
   useEffect(() => {
@@ -247,84 +250,134 @@ export default function MessageContent({ content }) {
     }
   }, [])
 
-  // 处理可能包含 think 标签的内容
-  const processContent = (content) => {
-    // 尝试解析文件消息
-    const fileMessageComponent = <FileMessage content={content} />;
-    
-    // 检查组件是否有效
-    if (fileMessageComponent && fileMessageComponent.props?.children) {
-      console.log('Rendering file message component');
-      return fileMessageComponent;
+  // 处理内容变化
+  useEffect(() => {
+    if (typeof content !== 'string') {
+      setProcessedContent({ mainContent: '', thinkContent: '' })
+      return
     }
 
-    console.log('Rendering as regular content');
-    const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/);
-    if (thinkMatch) {
-      const thinkContent = thinkMatch[1];
-      const remainingContent = content.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+    // 如果正在动画显示中，检查是否遇到 think 标签
+    if (showAnimation) {
+      const thinkStartMatch = content.match(/<think>/)
+      const thinkEndMatch = content.match(/<\/think>/)
       
-      return (
-        <>
-          <Collapse
-            ghost
-            className="mb-4 bg-yellow-50 rounded-lg"
-            style={{
-              background: token.colorWarningBg,
-              border: `1px solid ${token.colorWarningBorder}`
-            }}
-          >
-            <Panel 
-              header={
-                <div className="flex items-center text-yellow-800">
-                  <BulbOutlined className="mr-2" />
-                  <span>思考过程</span>
-                </div>
-              }
-              key="1"
-            >
-              <div className="text-yellow-700">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkMath]}
-                  rehypePlugins={[rehypeRaw, rehypeKatex, rehypeHighlight]}
-                  components={markdownComponents}
-                >
-                  {thinkContent}
-                </ReactMarkdown>
-              </div>
-            </Panel>
-          </Collapse>
-          {remainingContent && (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeRaw, rehypeKatex, rehypeHighlight]}
-              components={markdownComponents}
-            >
-              {remainingContent}
-            </ReactMarkdown>
-          )}
-        </>
-      );
+      if (thinkStartMatch && !thinkEndMatch) {
+        setIsThinking(true)
+        // 提取到目前为止的思考内容，只取 <think> 标签后的部分
+        const beforeThink = content.slice(0, thinkStartMatch.index)
+        const thinkContent = content.slice(thinkStartMatch.index + 7)
+        setCurrentThinkContent(thinkContent)
+        setProcessedContent({ 
+          mainContent: beforeThink, 
+          thinkContent: thinkContent
+        })
+        return
+      } 
+      
+      if (thinkEndMatch) {
+        // 找到最后一个 <think> 标签的位置
+        const lastThinkStart = content.lastIndexOf('<think>')
+        // 提取思考内容
+        const thinkContent = content.slice(lastThinkStart + 7, thinkEndMatch.index)
+        // 提取主要内容（think标签之前和之后的内容）
+        const beforeThink = content.slice(0, lastThinkStart)
+        const afterThink = content.slice(thinkEndMatch.index + 8)
+        
+        setIsThinking(false)
+        setProcessedContent({ 
+          mainContent: beforeThink + afterThink,
+          thinkContent: thinkContent
+        })
+        return
+      }
+
+      // 如果没有 think 标签，所有内容都是主要内容
+      setProcessedContent({
+        mainContent: content,
+        thinkContent: ''
+      })
+      return
     }
-    
-    return (
+
+    // 非动画显示时的正常处理
+    const thinkMatch = content.match(/<think>(.*?)<\/think>/s)
+    if (!thinkMatch) {
+      setProcessedContent({ mainContent: content, thinkContent: '' })
+      return
+    }
+
+    const beforeThink = content.slice(0, content.indexOf('<think>'))
+    const thinkContent = thinkMatch[1]
+    const afterThink = content.slice(content.indexOf('</think>') + 8)
+    const mainContent = beforeThink + afterThink
+    setProcessedContent({ mainContent, thinkContent })
+  }, [content, showAnimation, isThinking])
+
+  return (
+    <div>
+      {(processedContent.thinkContent || isThinking) && (
+        <Collapse
+          className="mb-2"
+          size="small"
+          defaultActiveKey={['1']}
+          items={[
+            {
+              key: '1',
+              label: (
+                <Space className="text-gray-500 text-xs">
+                  <BulbOutlined className={isThinking ? 'animate-pulse' : ''} />
+                  <span>{isThinking ? '正在深度思考...' : '思考过程'}</span>
+                </Space>
+              ),
+              children: (
+                <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeRaw, rehypeKatex, rehypeHighlight]}
+                    components={{
+                      ...markdownComponents,
+                      p: ({ children }) => (
+                        <p className="my-1 leading-relaxed text-gray-500 text-xs">{children}</p>
+                      ),
+                      li: ({ children, className, ...props }) => {
+                        if (className === 'task-list-item') {
+                          return (
+                            <li className="flex items-start my-1 text-gray-500 text-xs" {...props}>
+                              <input 
+                                type="checkbox" 
+                                className="mt-1 mr-2" 
+                                disabled 
+                              />
+                              <span>{children}</span>
+                            </li>
+                          )
+                        }
+                        return <li className="my-1 text-gray-500 text-xs" {...props}>{children}</li>
+                      },
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-4 border-gray-200 pl-4 my-2 text-gray-500 text-xs">
+                          {children}
+                        </blockquote>
+                      )
+                    }}
+                  >
+                    {processedContent.thinkContent}
+                  </ReactMarkdown>
+                </div>
+              )
+            }
+          ]}
+        />
+      )}
+      
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeRaw, rehypeKatex, rehypeHighlight]}
         components={markdownComponents}
       >
-        {content}
+        {processedContent.mainContent}
       </ReactMarkdown>
-    );
-  };
-
-  if (!hasMounted) {
-    return <div className="min-h-[20px]" />
-  }
-
-  return (
-    <div className="markdown-body prose prose-slate max-w-none dark:prose-invert">
-      {processContent(content)}
     </div>
   )
 } 

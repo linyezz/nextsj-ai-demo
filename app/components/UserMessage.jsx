@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Typography } from 'antd'
+import { Typography, Space } from 'antd'
 import { 
   FileOutlined,
   FilePdfOutlined,
@@ -51,7 +51,10 @@ const fileIconMap = {
 }
 
 // 获取文件图标
-const getFileIcon = (fileName) => {
+const getFileIcon = (fileName, type) => {
+  if (type === 'VIDEO') {
+    return <VideoCameraOutlined className="text-lg" />
+  }
   const extension = fileName.split('.').pop()?.toLowerCase()
   const IconComponent = fileIconMap[extension] || fileIconMap.default
   return <IconComponent className="text-lg" />
@@ -70,17 +73,24 @@ const FileMessage = ({ content }) => {
       return (
         <div className="flex items-center space-x-2 p-2 border rounded-lg hover:bg-gray-50 transition-colors w-fit">
           <div className="text-blue-500">
-            {getFileIcon(fileData.fileName)}
+            {getFileIcon(fileData.fileName, fileData.type)}
           </div>
           <Link href={fileData.url} target="_blank" className="hover:text-blue-500 transition-colors">
             {fileData.fileName}
           </Link>
         </div>
       )
+    } else {
+      // console.log('fileData， FileMessage',content)
+      return ( 
+      <div className="whitespace-pre-wrap break-words">
+        {content}
+      </div>
+      )
     }
   } catch (e) {
     // 如果解析失败，说明不是文件消息
-    return null
+    return(<div className="whitespace-pre-wrap break-words">{content}</div>)
   }
   return null
 }
@@ -88,14 +98,15 @@ const FileMessage = ({ content }) => {
 export default function UserMessage({ content }) {
   // 尝试解析文件消息
   const fileMessage = <FileMessage content={content} />
-  if (fileMessage?.props?.children) {
-    return fileMessage
-  }
+  return fileMessage
+  // if (fileMessage?.props?.children) {
+  //   return fileMessage
+  // }
 
-  // 普通文本消息
-  return (
-    <div className="whitespace-pre-wrap break-words">
-      {content}
-    </div>
-  )
+  // // 普通文本消息
+  // return (
+  //   <div className="whitespace-pre-wrap break-words">
+  //     {content}
+  //   </div>
+  // )
 } 

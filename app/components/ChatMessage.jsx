@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { Button, Avatar, Card, Space, Typography, Skeleton } from 'antd'
-import { RedoOutlined, StopOutlined, UserOutlined, RobotOutlined } from '@ant-design/icons'
+import { 
+  RedoOutlined, 
+  StopOutlined, 
+  UserOutlined, 
+  RobotOutlined,
+  LeftOutlined,
+  RightOutlined
+} from '@ant-design/icons'
 import MessageContent from './MessageContent'
 import UserMessage from './UserMessage'
 import { useHasMounted } from '@/app/hooks/useHasMounted'
@@ -12,12 +19,26 @@ const { Text } = Typography
 export default function ChatMessage({ 
   role, 
   content,
+  answerList = [],
   onRegenerate,
   onStop,
   isGenerating = false,
   showAnimation = true
 }) {
   const hasMounted = useHasMounted()
+  const [currentAnswerIndex, setCurrentAnswerIndex] = useState(0)
+  
+  const displayContent = answerList.length > 0 
+    ? answerList[currentAnswerIndex]?.content || ''
+    : content
+
+  const handlePrevAnswer = () => {
+    setCurrentAnswerIndex(prev => Math.max(0, prev - 1))
+  }
+
+  const handleNextAnswer = () => {
+    setCurrentAnswerIndex(prev => Math.min(answerList.length - 1, prev + 1))
+  }
 
   if (!hasMounted) {
     return (
@@ -45,23 +66,38 @@ export default function ChatMessage({
             {isUser ? (
               <UserMessage content={content} />
             ) : (
-              <MessageContent content={content} />
+              <MessageContent 
+                content={displayContent} 
+                showAnimation={showAnimation}
+              />
+            )}
+            
+            {!isUser && answerList.length > 1 && (
+              <div className="mt-3 flex items-center justify-center gap-4 border-t pt-2">
+                <Button 
+                  type="text" 
+                  icon={<LeftOutlined />} 
+                  onClick={handlePrevAnswer}
+                  disabled={currentAnswerIndex === 0}
+                  size="small"
+                />
+                <Text type="secondary" className="select-none">
+                  {currentAnswerIndex + 1} / {answerList.length}
+                </Text>
+                <Button 
+                  type="text" 
+                  icon={<RightOutlined />} 
+                  onClick={handleNextAnswer}
+                  disabled={currentAnswerIndex === answerList.length - 1}
+                  size="small"
+                />
+              </div>
             )}
           </Card>
           
           {!isUser && (
             <Space className="mt-2">
-              {isGenerating ? (
-                <Button
-                  type="text"
-                  icon={<StopOutlined />}
-                  onClick={onStop}
-                  size="small"
-                  danger
-                >
-                  停止回复
-                </Button>
-              ) : (
+              {!isGenerating && (
                 <Button
                   type="text"
                   icon={<RedoOutlined />}

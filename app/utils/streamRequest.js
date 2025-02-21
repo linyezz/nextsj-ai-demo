@@ -1,8 +1,9 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { message } from 'antd'
+import Cookies from 'js-cookie'
 
 const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL
-const token = process.env.NEXT_PUBLIC_API_TOKEN
+const token = Cookies.get('accessToken')
 
 const service = (
     options,
